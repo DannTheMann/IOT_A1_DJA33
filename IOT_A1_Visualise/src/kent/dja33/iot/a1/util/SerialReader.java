@@ -211,7 +211,7 @@ public class SerialReader {
 
 			} catch (SerialPortException exe) {
 				exe.printStackTrace();
-				Out.out.loglnErr("Failed t222o read from SerialPort \"" + openPort.getPortName() + "\".");
+				Out.out.loglnErr("Failed to read from SerialPort \"" + openPort.getPortName() + "\".");
 
 			}
 
