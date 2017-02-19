@@ -11,30 +11,73 @@ import javafx.scene.chart.XYChart.Data;
 import kent.dja33.iot.a1.util.Message;
 import kent.dja33.iot.a1.util.SerialReader;
 
+/**
+ * This class is designed to handle parsing input from the serialReader by
+ * popping off messages from its queue. These messages are then added to its own
+ * queue which is used to update the Graph with Sample objects.
+ * 
+ * Although the class has concurrent components it is also called within the FX
+ * thread to assure that updating the graph does not interfere between threaded
+ * objects.
+ * 
+ * @author Dante
+ *
+ */
 public class TemperatureHandler implements Runnable {
 
+	/* Title of the graph */
 	private static final String TITLE = "Temperature Samples";
+
+	/* Minimum and maximum scales allowed for Y boundary */
 	private static final int YAXIS_MIN_BOUNDARY_SHIFT = 1;
 	private static final int YAXIS_MAX_BOUNDARY_SHIFT = 25;
+
+	/* Minimum and maximum display ranges for samples */
 	private static final int MAX_DISPLAY = 250;
 	private static final int MIN_DISPLAY = 10;
+
+	/*
+	 * Default starting points for display size and the value to increment by
+	 */
 	private static final int DISPLAY_SIZE_INCREMENTAL_VALUE = 10;
 	private int displaySize = MAX_DISPLAY / 2;
 	private int yAxisBoundaryShift = YAXIS_MAX_BOUNDARY_SHIFT / 2;
 
+	/* Charts and axis that are relevant for updating */
 	private final LineChart<String, Number> chart;
 	private final XYChart.Series<String, Number> series;
 	private final NumberAxis yAxis;
 
+	/* Concurrent queue for samples which are used for updating the chart */
 	private ConcurrentLinkedQueue<Sample> dataQ = new ConcurrentLinkedQueue<Sample>();
 
+	/**
+	 * Create the TemperatureHandler, pass it the chart to update and the axis
+	 * to work with.
+	 * 
+	 * @param lineChart
+	 *            The chart we wish to update
+	 * @param xAxis
+	 *            The xAxis of that chart
+	 * @param yAxis
+	 *            The yAxis of that chart
+	 */
 	public TemperatureHandler(LineChart<String, Number> lineChart, CategoryAxis xAxis, NumberAxis yAxis) {
 		this.chart = lineChart;
+		/*
+		 * Create a series of data points that we can there add and remove
+		 * values from
+		 */
 		this.series = new XYChart.Series<String, Number>();
 		this.chart.getData().add(series);
 		this.yAxis = yAxis;
 	}
 
+	/**
+	 * Thread to handle adding messages to our queue, will try to read in all
+	 * available messages it can find that are flagged as DATA and add them to
+	 * the queue for processing later.
+	 */
 	@Override
 	public void run() {
 
@@ -44,6 +87,7 @@ public class TemperatureHandler implements Runnable {
 
 			while (msg != null) {
 
+				// If the message is not corrupted at all and is 100% good to go
 				if (msg.getPayload() == "" || msg.getPayload().length() == 0 || msg.getName() == Message.ERR) {
 					msg = SerialReader.in.popMessage(Message.DATA);
 					continue;
@@ -62,6 +106,13 @@ public class TemperatureHandler implements Runnable {
 
 	}
 
+	/**
+	 * Resize the chart based on the user scrolling in negative for scrolling
+	 * in, positive for scrolling out
+	 * 
+	 * @param deltaX
+	 *            The indent of the scroll factor,
+	 */
 	public void resizeChart(double deltaX) {
 
 		// Scroll in
@@ -89,13 +140,29 @@ public class TemperatureHandler implements Runnable {
 			}
 		}
 
+		// Update our changes to the graph
 		updateGraphHandler();
 
 	}
 
+	/* Average value stored here, used to work out where 
+	 * the limits on the Y range should be */
 	private int average;
+	
+	/* Whether the animation of the chart updating needs 
+	 * to be stopped */
 	private boolean stop;
 
+	/**
+	 * Update the chart being displayed, will try to update
+	 * the current refresh rate reported by the MBED and display 
+	 * that as well. Will remove all elements that exceed the
+	 * size of the displaySize that are 'old' and add all new 
+	 * elements it can. Finally updates the limits on the Y
+	 * axis so that the chart does not shift too far or become
+	 * to hard to read over varying values
+	 * @return true if the animation needs to stop
+	 */
 	public boolean updateGraphHandler() {
 
 		// Setting message
@@ -110,7 +177,7 @@ public class TemperatureHandler implements Runnable {
 			}
 
 		}
-		
+
 		if (dataQ.isEmpty()) {
 			return false;
 		}
@@ -133,10 +200,14 @@ public class TemperatureHandler implements Runnable {
 
 		yAxis.setLowerBound(average - yAxisBoundaryShift);
 		yAxis.setUpperBound(average + yAxisBoundaryShift);
-		
+
 		return stop;
 	}
 
+	/**
+	 * Start the animationTimer, which in turns starts
+	 * calling updateGraphHandler until its told to stop
+	 */
 	public void start() {
 		stop = false;
 		new AnimationTimer() {
@@ -150,18 +221,22 @@ public class TemperatureHandler implements Runnable {
 		}.start();
 	}
 
+	/**
+	 * Flag that the animation for the chart
+	 * needs to stop
+	 */
 	public void stop() {
 		stop = true;
 	}
 
-	public int getSampleSize() {
-		return dataQ.size();
-	}
-
-	public boolean isEmpty() {
-		return getSampleSize() == 0;
-	}
-
+	/**
+	 * Inner class used to store samples, effectively a wrapper
+	 * component for the Message itself that stores a 
+	 * conversion of the payload to a double and then the
+	 * timestamp it was given.
+	 * @author Dante
+	 *
+	 */
 	private class Sample {
 
 		private double sample;

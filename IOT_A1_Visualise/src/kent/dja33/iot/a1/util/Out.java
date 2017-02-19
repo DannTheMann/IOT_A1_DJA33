@@ -1,8 +1,4 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package kent.dja33.iot.a1.util;
 
 import java.io.BufferedWriter;
@@ -22,32 +18,48 @@ import kent.dja33.iot.a1.Main;
  */
 public final class Out {
 
+	/* Directories for use across the system */
 	private static final String ROOT_DIRECTORY = System.getProperty("user.dir") + File.separator + "SensorMBED";
 	public static final String RESOURCES_DIRECTORY = ROOT_DIRECTORY + File.separator + "Resources";
 
+	/* Format to output logged data in */
 	private static final DateFormat logTimeFormat = new SimpleDateFormat("HH:mm:ss");
 	private boolean printDebugMessages = true;
-	private final String LOG_DIRECTORY;
+
+	/* The absolute path for use in creating log files */
+	private final String LOG_FILE_PATH;
 	private final File log;
 	private boolean canLog;
+
+	/* Singleton reference */
 	private BufferedWriter writer;
 	public static Out out = new Out(ROOT_DIRECTORY + File.separator + "Logs");
 
+	/**
+	 * Create the logger, pass the directory expected to create log files in
+	 * 
+	 * @param logDir
+	 */
 	private Out(String logDir) {
-		
+
 		recordToLog("Creating logger...", true);
 
 		File dir = new File(logDir);
 
+		/* If the directory for creating logs in does not exist create it */
 		if (!dir.exists()) {
 			recordToLog("Directory '" + dir + "' did not exist. Creating it now...", true);
 			dir.mkdirs();
 		}
-		LOG_DIRECTORY = logDir + File.separator + "log" + new SimpleDateFormat("dd-MM-yy").format(new Date()) + ".txt";
-		log = new File(LOG_DIRECTORY);
+
+		/* Set the path for the log file */
+		LOG_FILE_PATH = logDir + File.separator + "log" + new SimpleDateFormat("dd-MM-yy").format(new Date()) + ".txt";
+		log = new File(LOG_FILE_PATH);
+
+		/* If the file does not exist then populate the new file */
 		if (!log.exists()) {
 			try {
-				recordToLog("Creating new log file: " + LOG_DIRECTORY, true);
+				recordToLog("Creating new log file: " + LOG_FILE_PATH, true);
 				log.createNewFile();
 			} catch (IOException ioe) {
 				recordToLog("Logger could not create file to write out to: " + ioe.getMessage(), true);
@@ -55,6 +67,7 @@ public final class Out {
 				return;
 			}
 		} else {
+			/* File already existed, append to the existing file */
 			recordToLog("File exists: " + log.getAbsolutePath(), true);
 		}
 		try {
@@ -73,17 +86,10 @@ public final class Out {
 		canLog = true;
 	}
 
-	public static boolean createLogger(String dir) {
-		if (out != null) {
-			Main.display.printlnErr("Can't create new logger, one already exists. Must be closed first.");
-			return false;
-		} else {
-			out = new Out(dir);
-			out.logln("Created new logger. '" + out.getAbsolutePath() + "'");
-			return true;
-		}
-	}
-
+	/**
+	 * Close the logger in use and all resources being used by it, including any
+	 * files currently open by the logger
+	 */
 	public static void close() {
 		out.logln("Closing logger.");
 		if (out != null && out.writer != null) {
@@ -98,11 +104,18 @@ public final class Out {
 		if (out != null) {
 			out = null;
 		}
-		// ...
 	}
 
+	/* Default message log prefix */
 	private static final String PREFIX = "[LOG] ";
 
+	/**
+	 * Log out an input object, will utilise the GUI if possible, suffixed with
+	 * '\n'
+	 * 
+	 * @param obj
+	 *            what to output
+	 */
 	public void logln(Object obj) {
 		if (Main.display != null && Main.display.isReady()) {
 			Main.display.println(obj);
@@ -113,6 +126,12 @@ public final class Out {
 		recordToLog(obj + System.lineSeparator(), true);
 	}
 
+	/**
+	 * Log out a '\n', utilises GUI if possible
+	 * 
+	 * @param obj
+	 *            what to output
+	 */
 	public void logln() {
 		if (Main.display != null && Main.display.isReady()) {
 			Main.display.println();
@@ -123,6 +142,12 @@ public final class Out {
 		recordToLog(System.lineSeparator(), false);
 	}
 
+	/**
+	 * Log out an input object, will utilise the GUI if possible
+	 * 
+	 * @param obj
+	 *            what to output
+	 */
 	public void log(Object obj) {
 		if (Main.display != null && Main.display.isReady()) {
 			Main.display.print(obj);
@@ -134,6 +159,13 @@ public final class Out {
 
 	}
 
+	/**
+	 * Log out an input object, will utilise the GUI if possible, includes a
+	 * timestamp
+	 * 
+	 * @param obj
+	 *            what to output
+	 */
 	public void logWithTime(Object obj) {
 		if (Main.display != null && Main.display.isReady()) {
 			Main.display.print(obj);
@@ -145,28 +177,51 @@ public final class Out {
 
 	}
 
+	/* The PREFIX for error messages */
+	private static final String ERROR_PREFIX = "[ERROR] ";
+	
+	/**
+	 * Log out an input object, will utilise the GUI if possible, suffixed with
+	 * '\n' includes a prefix of the ERROR_PREFIX 
+	 * 
+	 * @param obj
+	 *            what to output
+	 */
 	public void loglnErr(Object obj) {
 		if (Main.display != null && Main.display.isReady()) {
 			Main.display.printlnErr(obj);
 		} else {
-			System.out.println(ERROR_PREFIX + obj.toString() + " | " + Main.display.isReady());
+			System.out.println(ERROR_PREFIX + obj.toString());
 		}
 
 		recordToLog(ERROR_PREFIX + obj.toString(), true);
 	}
 
+	/**
+	 * Is the logger printing debug messages
+	 * @return
+	 */
 	public boolean isPrintingDebugMessages() {
 		return printDebugMessages;
 	}
 
+	/**
+	 * Set whether the log should print debug messages
+	 * @param print true if it should
+	 */
 	public void setPrintingDebugMessages(boolean print) {
 		printDebugMessages = print;
 	}
 
-	private static final String ERROR_PREFIX = "[ERROR] ";
-
+	/**
+	 * Attempt to write out a passed message to the current
+	 * log file, if chosen will also log the current time as
+	 * well.
+	 * @param str the message to log
+	 * @param logTime true to log time
+	 */
 	public void recordToLog(String str, boolean logTime) {
-		
+
 		if (canLog) {
 
 			try {
@@ -180,16 +235,24 @@ public final class Out {
 				loglnErr("Logger could not write to file: " + ioe.getMessage());
 			}
 
-		}else{
+		} else {
 			System.err.println(str);
 		}
 
 	}
 
+	/**
+	 * Get the directory of the log
+	 * @return directory
+	 */
 	public String getDirectory() {
 		return log.getParent();
 	}
 
+	/**
+	 * Get the absolutePath for the current log file
+	 * @return path
+	 */
 	private String getAbsolutePath() {
 		return log.getAbsolutePath();
 	}
