@@ -271,7 +271,7 @@ public class SerialReader {
 	public String getActivePort() {
 		return portName;
 	}
-
+	
 	/**
 	 * Wrapper singleton for handling inner workings of the SerialReaderEvents
 	 * 
@@ -375,7 +375,14 @@ public class SerialReader {
 		 */
 		private void addNewMessage(String potential) {
 
-			queuedInput.add(MessageHandler.getHandler().createMessage(potential));
+			Message msg = MessageHandler.getHandler().createMessage(potential);
+			
+			/* Discard failed message */
+			if(msg.getName().equals(MessageHandler.ERR)){
+				return;
+			}
+			
+			queuedInput.add(msg);
 
 		}
 

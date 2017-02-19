@@ -1,7 +1,12 @@
 package kent.dja33.iot.a1.util.message;
 
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
+
+import kent.dja33.iot.a1.Main;
+import kent.dja33.iot.a1.MeasurementType;
+import kent.dja33.iot.a1.TemperatureHandler;
 
 public class MessageHandler {
 	
@@ -19,7 +24,7 @@ public class MessageHandler {
 	/* Message ID, incremented on each assigning */
 	private static long messageID = 1;
 
-	private static MessageHandler handler;
+	private static MessageHandler handler = new MessageHandler();
 	
 	public static final MessageHandler getHandler(){
 		return handler;
@@ -46,7 +51,6 @@ public class MessageHandler {
 		
 		/* Extract the payload from the message */
 		String payload = name.substring(1, name.length());
-
 		/* Identify the type of Message */
 		switch (name.charAt(0)) {
 
@@ -101,49 +105,69 @@ public class MessageHandler {
 		public SettingMessage(String name, String timeStamp, String payload, long id) {
 			super(name, timeStamp, payload, id);
 		}
-
-		@Override
-		/**
-		 * Update from Celsius to Fahrenheit or back
-		 */
-		public void update() {
-			// TODO Auto-generated method stub
-			
-		}
 		
 	}
 	
 	private class DataMessage extends Message{
 		
+		float temperature;
+		float accelX;
+		float accelY;
+		float accelZ;
+		
 		public DataMessage(String name, String timeStamp, String payload, long id) {
 			super(name, timeStamp, payload, id);
+			
+			String[] payloadSplit = payload.split(":");
+			
+			System.out.println(payload + " | " + Arrays.toString(payloadSplit));
+			
+			// if size > n
 			
 			/* If we have data, then make sure it is not a potential error */
 			if (name == DATA) {
 	
-				try {
+				try {				
+					
+					temperature = Float.parseFloat(payloadSplit[0]);
+					accelX = Float.parseFloat(payloadSplit[1]);
+					accelY = Float.parseFloat(payloadSplit[2]);
+					accelZ = Float.parseFloat(payloadSplit[3]);
 	
-					float curVal = Float.parseFloat(payload);
-	
-					if ((curVal > lastPayload + MAX_DIFF || curVal < lastPayload - MAX_DIFF)
+					if ((temperature > lastPayload + MAX_DIFF || temperature < lastPayload - MAX_DIFF)
 							&& lastPayload != Float.MAX_VALUE) {
 						name = ERR;
 						return;
 					}
 	
-					lastPayload = Float.parseFloat(payload);
+					lastPayload = Float.parseFloat(payloadSplit[0]);
 				} catch (Exception e) {
+					System.err.println("Message useless, discarding...");
 					/* This message is considered an error and not reliable as data */
 					name = ERR;
 				}
 	
 			}
 		}
-
+		
 		@Override
-		public void update() {
-			// TODO Auto-generated method stub
+		public String getPayload(){
 			
+			/* TemperatureHandler has not been created yet */
+			if(Main.display.getMeasurementType() == null){
+				return "NOT_READY";
+			}
+			
+			if(Main.display.getMeasurementType().equals(MeasurementType.FAHRENHEIT)){
+				
+				temperature = MeasurementType.convert(MeasurementType.FAHRENHEIT, temperature);
+				return "" + temperature;
+				
+			}else if(Main.display.getMeasurementType().equals(MeasurementType.CELSIUS)){
+				return "" + temperature;
+			}
+			
+			return "INVALID CONVERSION";
 		}
 		
 	}

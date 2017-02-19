@@ -57,6 +57,7 @@ public class SensorDisplay extends Application {
 	private Button autodetect;
 	private Button increase;
 	private Button decrease;
+	private Button changeMeasurementType;
 	
 	/* Selection box for available serial ports */
 	private ComboBox<String> serialPortSelection;
@@ -64,7 +65,7 @@ public class SensorDisplay extends Application {
 	/* LineChart using the Date as a string on the X Axis
 	 * and the temperature reading as a number on the Y Axis */
 	private LineChart<String, Number> lineChart;
-	private TemperatureHandler temperature;
+	private static TemperatureHandler temperature;
 	
 	/* Static such that the Output reader can access it */
 	private static TextArea logBox;
@@ -125,8 +126,13 @@ public class SensorDisplay extends Application {
 						serialPortSelection.getItems().clear();
 						serialPortSelection.getItems().add(NO_SERIAL_PORT);
 						serialPortSelection.getItems().addAll(SerialReader.in.getActiveSerialPorts());
-						serialPortSelection.getSelectionModel().select(0);
-
+						
+						/* Set default selection to nothing if we're not connected */
+						if(!SerialReader.in.connected()){
+							serialPortSelection.getSelectionModel().select(0);
+						}else{
+							serialPortSelection.getSelectionModel().select(SerialReader.in.getActivePort());
+						}
 					}
 
 				});
@@ -180,17 +186,23 @@ public class SensorDisplay extends Application {
 					public void handle(ActionEvent event) {
 
 						Out.out.logln("Attempting to automatically connect to Serial port.");
+						
+						/* Disable button so it cannot be spammed */
 						autodetect.setDisable(true);
 						
 						/* For every serial channel, attempt to connect */
 						for (String com : SerialReader.in.getActiveSerialPorts()) {
 							if (SerialReader.in.openPort(com)) { // If successful
+								serialPortSelection.getSelectionModel().select(com);
 								connectSuccessful();
 								autodetect.setText("Auto-detect");
 								return;
 							}
 						}
 
+						/* If failed re-enable button */
+						autodetect.setDisable(false);
+						
 						/* Unable to automatically connect */
 						serialPortSelection.getSelectionModel().select(0);
 						logBox.setScrollTop(Double.MAX_VALUE);
@@ -241,6 +253,23 @@ public class SensorDisplay extends Application {
 				/* By default we are not connected, so both disabled */
 				increase.setDisable(true);
 				decrease.setDisable(true);
+				
+				/* Create a measurementType button, default is Celsius */
+				changeMeasurementType = new Button("To Fahrenheit");
+				changeMeasurementType.setDisable(true);
+				changeMeasurementType.setOnAction((event)->{
+					if(temperature.getMeasurementType() == MeasurementType.CELSIUS){
+						Out.out.logln("Switching to Fahrenheit");
+						temperature.switchMeasurementType(MeasurementType.FAHRENHEIT);
+						changeMeasurementType.setText("To Celsius");
+					}else if(temperature.getMeasurementType() == MeasurementType.FAHRENHEIT){
+						Out.out.logln("Switching to Celsius");
+						temperature.switchMeasurementType(MeasurementType.CELSIUS);
+						changeMeasurementType.setText("To Fahrenheit");						
+					}
+				});
+				
+				buttonPanel.getChildren().add(changeMeasurementType);
 				
 				/* For every node added, force the width and height */
 				for (Node n : buttonPanel.getChildren()) {
@@ -326,7 +355,7 @@ public class SensorDisplay extends Application {
 		
 		/* Animation adds a layer of confusion onto the graph, so this is removed
 		 * to allow the transitions between added elements to be simpler */
-		lineChart.setAnimated(false);
+		//lineChart.setAnimated(false);
 		lineChart.setTitle("Temperature Samples");
 
 		root.setCenter(lineChart);
@@ -376,6 +405,7 @@ public class SensorDisplay extends Application {
 		disconnect.setDisable(false);
 		increase.setDisable(false);
 		decrease.setDisable(false);
+		changeMeasurementType.setDisable(false);
 		temperature.start();
 	}
 
@@ -392,9 +422,14 @@ public class SensorDisplay extends Application {
 		autodetect.setDisable(false);
 		increase.setDisable(true);
 		decrease.setDisable(true);
+		changeMeasurementType.setDisable(true);
 		temperature.stop();
 	}
 
+	public MeasurementType getMeasurementType(){
+		return temperature != null ? temperature.getMeasurementType() : null;
+	}
+	
 	/**
 	 * Whether the GUI has been built and
 	 * is on display.

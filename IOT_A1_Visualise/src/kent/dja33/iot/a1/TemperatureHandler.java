@@ -51,7 +51,9 @@ public class TemperatureHandler implements Runnable {
 
 	/* Concurrent queue for samples which are used for updating the chart */
 	private ConcurrentLinkedQueue<Sample> dataQ = new ConcurrentLinkedQueue<Sample>();
-
+	/* Are we measuring in Celsius or Fahrenheit, default is Celsius */
+	private MeasurementType measurementType;
+	
 	/**
 	 * Create the TemperatureHandler, pass it the chart to update and the axis
 	 * to work with.
@@ -72,6 +74,8 @@ public class TemperatureHandler implements Runnable {
 		this.series = new XYChart.Series<String, Number>();
 		this.chart.getData().add(series);
 		this.yAxis = yAxis;
+		this.measurementType = MeasurementType.CELSIUS;
+		this.yAxis.setLabel("Temperature " + this.measurementType.getMeasurementSymbol());
 	}
 
 	/**
@@ -105,6 +109,34 @@ public class TemperatureHandler implements Runnable {
 			// ... Stop thread
 		}
 
+	}
+	
+	public MeasurementType getMeasurementType() {
+		return measurementType;
+	}
+	
+	/**
+	 * 
+	 * @param string
+	 */
+	public void switchMeasurementType(MeasurementType type) {
+		
+		pause = true;
+		
+		measurementType = type;
+		
+		yAxis.setLabel("Temperature " + measurementType.getMeasurementSymbol());
+		
+		series.getData().forEach((val)->{
+			val.setYValue(MeasurementType.convert(type, val.getYValue().floatValue()));
+		});
+		
+		dataQ.forEach((val)->{
+			val.setSample(MeasurementType.convert(type, val.getSample()));
+		});
+		
+		pause = false;
+		
 	}
 
 	/**
@@ -153,6 +185,11 @@ public class TemperatureHandler implements Runnable {
 	/* Whether the animation of the chart updating needs 
 	 * to be stopped */
 	private boolean stop;
+	
+	/* Pause updating the graph handler, useful for when needing
+	 * to convert existing values to new temperature format
+	 */
+	private boolean pause;
 
 	/**
 	 * Update the chart being displayed, will try to update
@@ -165,7 +202,7 @@ public class TemperatureHandler implements Runnable {
 	 * @return true if the animation needs to stop
 	 */
 	public boolean updateGraphHandler() {
-
+		
 		// Setting message
 		Message msg = SerialReader.in.popLatestMessage(MessageHandler.SETTING);
 
@@ -177,9 +214,9 @@ public class TemperatureHandler implements Runnable {
 				chart.setTitle(TITLE + " { Refresh rate: " + payloadSplit[1] + "ms }");
 			}
 
-		}
+		}	
 
-		if (dataQ.isEmpty()) {
+		if (dataQ.isEmpty() || pause) {
 			return false;
 		}
 
@@ -240,16 +277,20 @@ public class TemperatureHandler implements Runnable {
 	 */
 	private class Sample {
 
-		private double sample;
-		private String timeStamp;
+		private float sample;
+		private final String timeStamp;
 
 		public Sample(Message msg) {
-			sample = Double.parseDouble(msg.getPayload());
+			sample = Float.parseFloat(msg.getPayload());
 			timeStamp = msg.getTimeReceived();
 		}
 
-		public double getSample() {
+		public float getSample() {
 			return sample;
+		}
+		
+		public void setSample(float sample){
+			this.sample = sample;
 		}
 
 		public String getTimeStamp() {
@@ -257,5 +298,4 @@ public class TemperatureHandler implements Runnable {
 		}
 
 	}
-
 }

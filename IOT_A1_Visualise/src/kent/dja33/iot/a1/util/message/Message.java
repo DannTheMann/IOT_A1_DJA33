@@ -1,8 +1,5 @@
 package kent.dja33.iot.a1.util.message;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
 /**
  * Wrapper class to handle incoming serial data
  * 
@@ -35,9 +32,10 @@ public abstract class Message {
 	 * interpreted as a String 
 	 * @param name The String form of the bytes received from Serial
 	 */
-	public Message(String name, String timeStamp, String payload, long id) {
+	public Message(String name, String timeStamp, String payload, long id) {		
 		this.name = name;
 		this.timeStamp = timeStamp;
+		this.payload = payload;
 		if(this.payload != null){
 			this.payload = payload;
 		}else{
@@ -45,9 +43,6 @@ public abstract class Message {
 		}
 		this.id = id;
 	}
-	
-	/* Designed to overriden if messages need updating */
-	public void update(){}
 
 	/**
 	 * Get the name of this message type 
@@ -61,7 +56,7 @@ public abstract class Message {
 	 * Get the payload of this message
 	 * @return payload
 	 */
-	public final String getPayload() {
+	public String getPayload() {
 		return payload;
 	}
 
