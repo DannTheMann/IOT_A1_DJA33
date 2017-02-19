@@ -15,9 +15,9 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.chart.CategoryAxis;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
-import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.TextArea;
@@ -32,26 +32,28 @@ import kent.dja33.iot.a1.util.SerialReader;
 public class SensorDisplay extends Application {
 
 	private static final String TITLE = "MBED FRDM-K64F Temperature Monitor";
-	private Stage stage;
-	private Scene scene;
 	private BorderPane root;
 	private VBox buttonPanel;
 	private Button connect;
 	private Button disconnect;
 	private Button autodetect;
-	private LineChart<Number, Number> lineChart;
-	private TemperatureThread temperature;
-	private static TextArea log;
+	private LineChart<String, Number> lineChart;
+	private TemperatureHandler temperature;
+	private static TextArea logBox;
 	private static boolean ready = false;
 
 	public static final int MAX_WINDOW_WIDTH = 1920;
 	public static final int MAX_WINDOW_HEIGHT = 1080;
 	public static final int MIN_WINDOW_WIDTH = 720;
 	public static final int MIN_WINDOW_HEIGHT = 480;
+	public static final String NO_SERIAL_PORT = "NO SERIAL PORT";
+	
+	private ComboBox<String> serialPortSelection;
+	private Button increase;
+	private Button decrease;
 
 	@Override
 	public void start(Stage stage) throws Exception {
-		this.stage = stage;
 		stage.setTitle(TITLE);
 
 		root = new BorderPane();
@@ -62,10 +64,10 @@ public class SensorDisplay extends Application {
 
 			{
 
-				ObservableList<String> options = FXCollections.observableArrayList(new String[] { "NONE" });
+				ObservableList<String> options = FXCollections.observableArrayList(new String[] { NO_SERIAL_PORT });
 				options.addAll(SerialReader.in.getActiveSerialPorts());
 
-				ComboBox<String> serialPortSelection = new ComboBox<>(options);
+				serialPortSelection = new ComboBox<>(options);
 
 				serialPortSelection.getSelectionModel().select(0);
 
@@ -73,7 +75,7 @@ public class SensorDisplay extends Application {
 					@Override
 					public void changed(ObservableValue<? extends String> observable, String oldValue,
 							String newValue) {
-						connect.setDisable(newValue == "NONE" || SerialReader.in.connected());
+						connect.setDisable(newValue == NO_SERIAL_PORT || SerialReader.in.connected());
 					}
 				});
 
@@ -86,7 +88,7 @@ public class SensorDisplay extends Application {
 
 						Out.out.logln("Refreshing available serial ports.");
 						serialPortSelection.getItems().clear();
-						serialPortSelection.getItems().add("NONE");
+						serialPortSelection.getItems().add(NO_SERIAL_PORT);
 						serialPortSelection.getItems().addAll(SerialReader.in.getActiveSerialPorts());
 						serialPortSelection.getSelectionModel().select(0);
 
@@ -106,11 +108,9 @@ public class SensorDisplay extends Application {
 					public void handle(ActionEvent event) {
 
 						if (SerialReader.in.openPort(serialPortSelection.getSelectionModel().getSelectedItem())) {
-							Out.out.logln("Connected to \"" + serialPortSelection.getSelectionModel().getSelectedItem()
-									+ "\".");
-							connect.setDisable(true);
-							autodetect.setDisable(true);
-							disconnect.setDisable(false);
+							connectSuccessful();
+						}else{
+							Out.out.logln("Unable to connect to \"" + serialPortSelection.getSelectionModel().getSelectedItem() + "\"");
 						}
 
 					}
@@ -126,11 +126,7 @@ public class SensorDisplay extends Application {
 					public void handle(ActionEvent event) {
 
 						if (SerialReader.in.closePort()) {
-							Out.out.logln("Disconnected from \""
-									+ serialPortSelection.getSelectionModel().getSelectedItem() + "\".");
-							disconnect.setDisable(true);
-							connect.setDisable(false);
-							autodetect.setDisable(false);
+							disconnectSuccessful();
 						}
 
 					}
@@ -147,38 +143,27 @@ public class SensorDisplay extends Application {
 					@Override
 					public void handle(ActionEvent event) {
 
-						autodetect.setText(" Wait ... ");
+						Out.out.logln("Attempting to automatically connect to Serial port.");
 						autodetect.setDisable(true);
 						
 						for (String com : SerialReader.in.getActiveSerialPorts()) {
 							if (SerialReader.in.openPort(com)) {
-								Out.out.logln("Automatically connected to \"" + com + "\".");
-								serialPortSelection.getSelectionModel().select(getIndex(com));
-								connect.setDisable(true);
-								disconnect.setDisable(false);					
+								connectSuccessful();
 								autodetect.setText("Auto-detect");
 								return;
 							}
 						}
-						
-						autodetect.setText("Auto-detect");
+
 						autodetect.setDisable(false);
 
 						serialPortSelection.getSelectionModel().select(0);
+						logBox.setScrollTop(Double.MAX_VALUE);
 						Out.out.loglnErr("Could not automatically connect to any sensor devices.");
 
 					}
 
-					private int getIndex(String com) {
-						for (int i = 1; i <= SerialReader.in.getActiveSerialPorts().length; i++) {
-							if (com.equals(SerialReader.in.getActiveSerialPorts()[i - 1]))
-								return i;
-						}
-						return 0;
-					}
-
 				});
-				
+
 				button = new Button("Clear log");
 
 				button.setOnAction(new EventHandler<ActionEvent>() {
@@ -186,7 +171,7 @@ public class SensorDisplay extends Application {
 					@Override
 					public void handle(ActionEvent event) {
 
-						log.setText("");
+						logBox.setText("");
 						Out.out.logln("Log cleared.");
 
 					}
@@ -196,7 +181,26 @@ public class SensorDisplay extends Application {
 				buttonPanel.getChildren().add(autodetect);
 				buttonPanel.getChildren().add(button);
 				buttonPanel.setPadding(new Insets(5, 5, 5, 5));
+				
+				increase = new Button("Increase Rate");
+				increase.setOnAction((event)->{
+					Out.out.logln("Increasing the refresh rate.");
+					SerialReader.in.sendPayload("#T0");
+				});
+				
+				buttonPanel.getChildren().add(increase);
+				
+				decrease = new Button("Decrease Rate");
+				decrease.setOnAction((event)->{
+					Out.out.logln("Decreasing the refresh rate.");
+					SerialReader.in.sendPayload("#T1");
+				});
+				
+				buttonPanel.getChildren().add(decrease);
 
+				increase.setDisable(true);
+				decrease.setDisable(true);
+				
 				for (Node n : buttonPanel.getChildren()) {
 					if (n instanceof Region) {
 						Region node = (Region) n;
@@ -204,7 +208,7 @@ public class SensorDisplay extends Application {
 						node.setMinWidth(120);
 					}
 				}
-
+				
 			}
 
 			buttonPanel.setAlignment(Pos.CENTER_LEFT);
@@ -212,25 +216,29 @@ public class SensorDisplay extends Application {
 			StackPane sp = new StackPane();
 
 			{
-				log = new TextArea();
-				log.setEditable(false);
 
-				log.textProperty().addListener(new ChangeListener<Object>() {
-					@Override
-					public void changed(ObservableValue<?> observable, Object oldValue, Object newValue) {
-						log.setScrollTop(Double.MAX_VALUE); // this will scroll
-															// to the bottom
-						// use Double.MIN_VALUE to scroll to the top
-					}
-				});
+						logBox = new TextArea();
+						logBox.setEditable(false);
 
-				log.setMaxHeight(MAX_WINDOW_HEIGHT / 10);
-				log.setMinHeight(MIN_WINDOW_HEIGHT / 10);
-				log.setMaxWidth(MAX_WINDOW_WIDTH / 3);
-				log.setMinWidth(MIN_WINDOW_WIDTH / 3);
+						logBox.textProperty().addListener(new ChangeListener<Object>() {
+							@Override
+							public void changed(ObservableValue<?> observable, Object oldValue, Object newValue) {
+								logBox.setScrollTop(Double.MAX_VALUE); // this will
+																	// scroll
+																	// to the
+																	// bottom
+								// use Double.MIN_VALUE to scroll to the top
+							}
+						});
+
+						logBox.setMaxHeight(MAX_WINDOW_HEIGHT / 10);
+						logBox.setMinHeight(MIN_WINDOW_HEIGHT / 10);
+						logBox.setMaxWidth(MAX_WINDOW_WIDTH / 3);
+						logBox.setMinWidth(MIN_WINDOW_WIDTH / 3);
+
 			}
 
-			sp.getChildren().add(log);
+			sp.getChildren().add(logBox);
 			sp.setPadding(new Insets(5, 5, 20, 5));
 
 			sp.setAlignment(Pos.CENTER);
@@ -240,35 +248,36 @@ public class SensorDisplay extends Application {
 		root.setRight(buttonPanel);
 
 		// defining the axes
-		final NumberAxis xAxis = new NumberAxis();
+		final CategoryAxis xAxis = new CategoryAxis();
 		final NumberAxis yAxis = new NumberAxis();
-		xAxis.setLabel("Number of Month");
+		xAxis.setLabel("Time");
+		yAxis.setLabel("Temperature");
 		// creating the chart
-		lineChart = new LineChart<Number, Number>(xAxis, yAxis);
+		lineChart = new LineChart<String, Number>(xAxis, yAxis) {
+			// Override to remove symbols on each data point
+			@Override
+			protected void dataItemAdded(Series<String, Number> series, int itemIndex, Data<String, Number> item) {
 
-		lineChart.setTitle("Stock Monitoring, 2010");
+			}
+		};
+
+		lineChart.setOnScroll((event) -> {
+
+			temperature.resizeChart(event.getDeltaY());
+
+		});
+
+		yAxis.setAutoRanging(false);
+		xAxis.setAutoRanging(true);
+
+		lineChart.setLegendVisible(false);
+		lineChart.setAnimated(false);
+		lineChart.setTitle("Temperature Samples");
 		// defining a series
-		XYChart.Series series = new XYChart.Series();
-		series.setName("My portfolio");
-		// populating the series with data
-		series.getData().add(new XYChart.Data<Integer, Integer>(1, 23));
-		series.getData().add(new XYChart.Data<Integer, Integer>(2, 14));
-		series.getData().add(new XYChart.Data<Integer, Integer>(3, 15));
-		series.getData().add(new XYChart.Data<Integer, Integer>(4, 24));
-		series.getData().add(new XYChart.Data<Integer, Integer>(5, 34));
-		series.getData().add(new XYChart.Data<Integer, Integer>(6, 36));
-		series.getData().add(new XYChart.Data<Integer, Integer>(7, 22));
-		series.getData().add(new XYChart.Data<Integer, Integer>(8, 45));
-		series.getData().add(new XYChart.Data<Integer, Integer>(9, 43));
-		series.getData().add(new XYChart.Data<Integer, Integer>(10, 17));
-		series.getData().add(new XYChart.Data<Integer, Integer>(11, 29));
-		series.getData().add(new XYChart.Data<Integer, Integer>(12, 25));
 
 		root.setCenter(lineChart);
 
 		Scene scene = new Scene(root, MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT);
-
-		lineChart.getData().add(series);
 
 		stage.setScene(scene);
 
@@ -279,17 +288,39 @@ public class SensorDisplay extends Application {
 		stage.setMaxWidth(MAX_WINDOW_WIDTH);
 
 		ready = true;
-		
-		stage.setOnCloseRequest(e->{
+
+		stage.setOnCloseRequest(e -> {
 			SerialReader.in.closePort();
 			Out.close();
+			System.exit(0);
 		});
 
-		temperature = new TemperatureThread(lineChart);
+		temperature = new TemperatureHandler(lineChart, xAxis, yAxis);
+
 		ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-		executor.scheduleAtFixedRate(temperature, 0, 1, TimeUnit.SECONDS);
-		
+		executor.scheduleAtFixedRate(temperature, 0, 250, TimeUnit.MILLISECONDS);
+
 		stage.show();
+	}
+
+	protected void connectSuccessful() {
+		Out.out.logln("Connected to \"" + SerialReader.in.getActivePort() + "\".");
+		connect.setDisable(true);
+		autodetect.setDisable(true);
+		disconnect.setDisable(false);
+		increase.setDisable(false);
+		decrease.setDisable(false);
+		temperature.start();
+	}
+
+	protected void disconnectSuccessful() {
+		Out.out.logln("Disconnected from \"" + SerialReader.in.getActivePort() + "\".");
+		disconnect.setDisable(true);
+		connect.setDisable(false);
+		autodetect.setDisable(false);
+		increase.setDisable(true);
+		decrease.setDisable(true);
+		temperature.stop();
 	}
 
 	public boolean isReady() {
@@ -301,19 +332,19 @@ public class SensorDisplay extends Application {
 	}
 
 	public void printlnErr(Object obj) {
-		log.appendText("[WARNING] " + obj + "\n");
+		logBox.appendText("[WARNING] " + obj + "\n");
 	}
 
 	public void print(Object obj) {
-		log.appendText(obj + "");
+		logBox.appendText(obj + "");
 	}
 
 	public void println() {
-		log.appendText("\n");
+		logBox.appendText("\n");
 	}
 
 	public void println(Object obj) {
-		log.appendText(obj + "\n");
+		logBox.appendText(obj + "\n");
 	}
 
 }

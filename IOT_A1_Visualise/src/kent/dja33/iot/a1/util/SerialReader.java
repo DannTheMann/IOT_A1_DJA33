@@ -3,9 +3,6 @@ package kent.dja33.iot.a1.util;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import jssc.SerialPort;
 import jssc.SerialPortEvent;
 import jssc.SerialPortEventListener;
@@ -37,7 +34,7 @@ public class SerialReader {
 		}
 
 		if (Arrays.stream(getActiveSerialPorts()).filter(port -> port.equals(portName)).count() > 0) {
-
+			
 			try {
 
 				if (portName.equals("NONE")) {
@@ -45,15 +42,15 @@ public class SerialReader {
 					return false;
 				}
 
-				port = new SerialPort(portName);
-				port.openPort();
-				port.setParams(SerialPort.BAUDRATE_9600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1,
+				this.port = new SerialPort(portName);
+				this.port.openPort();
+				this.port.setParams(SerialPort.BAUDRATE_9600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1,
 						SerialPort.PARITY_NONE);
 
 				this.portName = portName;
 
-				portReader = new SerialReaderEventHandler(port);
-				port.addEventListener(portReader);
+				this.portReader = new SerialReaderEventHandler(port);
+				this.port.addEventListener(portReader);
 				int retries = RETRY_CONNECTION_ATTEMPTS;
 
 				try {
@@ -61,7 +58,7 @@ public class SerialReader {
 					while (retries > 0) {
 
 						// Send Acknowledgement
-						Out.out.logln("Sending ACK. ");
+						Out.out.log("Sending ACK. ");
 
 						if (!sendPayload("#ACK")) {
 							Out.out.logln("Unable to transmit, retrying... " + retries-- + " more times...");
@@ -69,7 +66,7 @@ public class SerialReader {
 						}
 
 						// Wait for response
-						Thread.sleep(500);
+						Thread.sleep(250);
 
 						if (portReader.find("ACKR") != null) {
 							if (sendPayload("#ACKC")) {
@@ -130,12 +127,20 @@ public class SerialReader {
 		return port != null && port.isOpened();
 	}
 
-	public List<String> getAllMessages() {
+	public List<Message> getAllMessages() {
 		return portReader.messages();
 	}
 
-	public String popMessage() {
+	public Message popMessage() {
 		return portReader != null ? portReader.popMessage() : null;
+	}
+
+	public Message popMessage(String data) {
+		return portReader != null ? portReader.popMessage(data) : null;
+	}
+	
+	public Message popLatestMessage(String data){
+		return portReader != null ? portReader.popLatestMessage(data) : null;	
 	}
 
 	public String pollActiveSerialPort() {
@@ -157,11 +162,10 @@ public class SerialReader {
 	private static class SerialReaderEventHandler implements SerialPortEventListener {
 
 		private final SerialPort openPort;
-		private final List<String> queuedInput = new ArrayList<>();
+		private static final List<Message> queuedInput = new ArrayList<>();
 		private char[] readBuffer;
 		private byte pointer;
-		private boolean readingData;
-
+		
 		public SerialReaderEventHandler(SerialPort port) {
 			this.openPort = port;
 			readBuffer = new char[256];
@@ -196,7 +200,7 @@ public class SerialReader {
 						potential += b;
 					}else if(!potential.equals("") && b == '#'){
 						Out.out.recordToLog(" {MSG} -> {" + potential.replaceAll("#","") + "} \n", true);
-						queuedInput.add(potential.replaceAll("#",""));
+						addNewMessage(potential);
 						readBuffer = new char[256];
 						pointer = 0;
 						break;
@@ -205,7 +209,7 @@ public class SerialReader {
 					}
 				}
 
-				openPort.purgePort(SerialPort.PURGE_RXCLEAR);
+				//openPort.purgePort(SerialPort.PURGE_RXCLEAR);
 
 				return true;
 
@@ -219,11 +223,16 @@ public class SerialReader {
 
 		}
 
+		private void addNewMessage(String potential) {
+			
+			queuedInput.add(new Message(potential));
+			
+		}
+
 		@Override
 		public void serialEvent(SerialPortEvent event) {
 			if (event.isRXCHAR()) {// If data is available
-					boolean result = readInput(event.getEventValue());
-					if (!result) {
+					if (!readInput(event.getEventValue())) {
 						Out.out.loglnErr("Failed to read from SerialPort \"" + openPort.getPortName() + "\".");
 					}
 				
@@ -242,36 +251,70 @@ public class SerialReader {
 			}
 		}
 
-		public String popMessage() {
+		public Message popMessage() {
 			if (queuedInput.size() > 0) {
-				String msg = queuedInput.get(0);
+				Message msg = queuedInput.get(0);
 				queuedInput.remove(0);
 				return msg;
 			} else {
 				return null;
 			}
 		}
-
-		public String find(String str) {
-			String msg = popMessage();
-			while (msg != null && !msg.equals(str)) {
-				msg = popMessage();
+		
+		public Message popMessage(String type){			
+			return popMessage(type, 0);
+		}
+		
+		public Message popLatestMessage(String type){
+			Message msg = popMessage(type, 0);
+			while(msg != null){
+				msg = popMessage(type, 0);
+			}
+			return msg;
+		}
+		
+		private Message popMessage(String type, int n){
+			
+			if (queuedInput.size() > n) {
+				Message msg = queuedInput.get(n);
+				if(msg == null)
+					return null;
+				if(msg.getName().equals(type)){
+					queuedInput.remove(n);
+					return msg;
+				}else{
+					return popMessage(type, ++n);
+				}
+			} else {
+				return null;
+			}
+			
+		}
+		
+		public Message find(String str) {
+			Message msg = popMessage();
+				
+			if(msg != null && msg.getPayload() == null)
+				return find(str);
+			
+			while (msg != null && msg.getPayload() != null 
+					&& str != null && !msg.getPayload().equals(str)) {
+				msg = popMessage();			
 			}
 			return msg;
 		}
 
-		public List<String> messages() {
+		public List<Message> messages() {
 			return new ArrayList<>(queuedInput);
 		}
 
-		public boolean isReadingData() {
-			return readingData;
-		}
-
 		public void setReadingData(boolean readingData) {
-			this.readingData = readingData;
 		}
 
+	}
+
+	public String getActivePort() {
+		return portName;
 	}
 
 }

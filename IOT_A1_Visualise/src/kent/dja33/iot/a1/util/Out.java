@@ -180,6 +180,8 @@ public final class Out {
 				loglnErr("Logger could not write to file: " + ioe.getMessage());
 			}
 
+		}else{
+			System.err.println(str);
 		}
 
 	}
