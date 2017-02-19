@@ -255,13 +255,4 @@ public final class Out {
 		return log.getParent();
 	}
 
-	/**
-	 * Get the absolutePath for the current log file
-	 * 
-	 * @return path
-	 */
-	private String getAbsolutePath() {
-		return log.getAbsolutePath();
-	}
-
 }

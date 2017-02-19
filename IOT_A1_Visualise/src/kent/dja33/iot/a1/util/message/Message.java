@@ -3,13 +3,7 @@ package kent.dja33.iot.a1.util.message;
 /**
  * Wrapper class to handle incoming serial data
  * 
- * Formats the data coming in and separates it based on fields 
- * of relevance, such as:
- * 
- *  -> D = Data (Temperature samples) 
- *  -> S = Setting (Change a setting)
- *  -> A = Acknowledgement (Acknowledge each other)
- *  -> * = Error (None of the above)
+ * Used as skeleton for messages that share similarities 
  *  
  * These messages are then slightly tweaked based on their role.
  * Data messages are checked to see whether their values are 

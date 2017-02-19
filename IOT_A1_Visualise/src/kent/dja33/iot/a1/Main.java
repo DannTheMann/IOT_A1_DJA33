@@ -15,8 +15,6 @@ public class Main {
 	
 	public static void main(String[] args){
 		
-		//System.out.print("hello");
-		
 		Out.out.logln("Starting application...");	
 		
 		display.launch();
