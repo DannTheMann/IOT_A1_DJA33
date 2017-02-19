@@ -179,10 +179,10 @@ public final class Out {
 
 	/* The PREFIX for error messages */
 	private static final String ERROR_PREFIX = "[ERROR] ";
-	
+
 	/**
 	 * Log out an input object, will utilise the GUI if possible, suffixed with
-	 * '\n' includes a prefix of the ERROR_PREFIX 
+	 * '\n' includes a prefix of the ERROR_PREFIX
 	 * 
 	 * @param obj
 	 *            what to output
@@ -199,6 +199,7 @@ public final class Out {
 
 	/**
 	 * Is the logger printing debug messages
+	 * 
 	 * @return
 	 */
 	public boolean isPrintingDebugMessages() {
@@ -207,18 +208,22 @@ public final class Out {
 
 	/**
 	 * Set whether the log should print debug messages
-	 * @param print true if it should
+	 * 
+	 * @param print
+	 *            true if it shouldF
 	 */
 	public void setPrintingDebugMessages(boolean print) {
 		printDebugMessages = print;
 	}
 
 	/**
-	 * Attempt to write out a passed message to the current
-	 * log file, if chosen will also log the current time as
-	 * well.
-	 * @param str the message to log
-	 * @param logTime true to log time
+	 * Attempt to write out a passed message to the current log file, if chosen
+	 * will also log the current time as well.
+	 * 
+	 * @param str
+	 *            the message to log
+	 * @param logTime
+	 *            true to log time
 	 */
 	public void recordToLog(String str, boolean logTime) {
 
@@ -243,6 +248,7 @@ public final class Out {
 
 	/**
 	 * Get the directory of the log
+	 * 
 	 * @return directory
 	 */
 	public String getDirectory() {
@@ -251,6 +257,7 @@ public final class Out {
 
 	/**
 	 * Get the absolutePath for the current log file
+	 * 
 	 * @return path
 	 */
 	private String getAbsolutePath() {

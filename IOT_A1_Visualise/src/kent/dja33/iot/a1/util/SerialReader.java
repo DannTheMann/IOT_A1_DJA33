@@ -9,6 +9,8 @@ import jssc.SerialPortEventListener;
 import jssc.SerialPortException;
 import jssc.SerialPortList;
 import kent.dja33.iot.a1.SensorDisplay;
+import kent.dja33.iot.a1.util.message.Message;
+import kent.dja33.iot.a1.util.message.MessageHandler;
 
 /**
  * 
@@ -373,7 +375,7 @@ public class SerialReader {
 		 */
 		private void addNewMessage(String potential) {
 
-			queuedInput.add(new Message(potential));
+			queuedInput.add(MessageHandler.getHandler().createMessage(potential));
 
 		}
 

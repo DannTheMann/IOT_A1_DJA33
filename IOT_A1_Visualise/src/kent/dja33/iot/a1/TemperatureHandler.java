@@ -8,8 +8,9 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.chart.XYChart.Data;
-import kent.dja33.iot.a1.util.Message;
 import kent.dja33.iot.a1.util.SerialReader;
+import kent.dja33.iot.a1.util.message.Message;
+import kent.dja33.iot.a1.util.message.MessageHandler;
 
 /**
  * This class is designed to handle parsing input from the serialReader by
@@ -83,19 +84,19 @@ public class TemperatureHandler implements Runnable {
 
 		try {
 
-			Message msg = SerialReader.in.popMessage(Message.DATA);
+			Message msg = SerialReader.in.popMessage(MessageHandler.DATA);
 
 			while (msg != null) {
 
 				// If the message is not corrupted at all and is 100% good to go
-				if (msg.getPayload() == "" || msg.getPayload().length() == 0 || msg.getName() == Message.ERR) {
-					msg = SerialReader.in.popMessage(Message.DATA);
+				if (msg.getPayload() == "" || msg.getPayload().length() == 0 || msg.getName() == MessageHandler.ERR) {
+					msg = SerialReader.in.popMessage(MessageHandler.DATA);
 					continue;
 				}
 
 				dataQ.add(new Sample(msg));
 
-				msg = SerialReader.in.popMessage(Message.DATA);
+				msg = SerialReader.in.popMessage(MessageHandler.DATA);
 
 			}
 
@@ -166,7 +167,7 @@ public class TemperatureHandler implements Runnable {
 	public boolean updateGraphHandler() {
 
 		// Setting message
-		Message msg = SerialReader.in.popLatestMessage(Message.SETTING);
+		Message msg = SerialReader.in.popLatestMessage(MessageHandler.SETTING);
 
 		if (msg != null) {
 
