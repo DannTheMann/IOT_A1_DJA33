@@ -248,10 +248,11 @@ public class SensorHandler implements Runnable {
 				temperatureChartSeries.getData()
 						.add(new Data<String, Number>(s.getTimeStamp(), s.getTemperatureSample()));
 
-				/* Update Accelerometer scatter graph */
-				accelerometerChartSeries.getData().get(0).setXValue(s.getX());
-				accelerometerChartSeries.getData().get(0).setYValue(s.getY());
-				float z = (float) (1 - s.getZ() < 0 ? 0.1 : 1 - s.getZ());
+				/* Update Accelerometer scatter graph, some calculations
+				 *  performed to make the outlook match up with direction */
+				accelerometerChartSeries.getData().get(0).setXValue(s.getY()*-1);
+				accelerometerChartSeries.getData().get(0).setYValue(s.getX());
+				float z = (float) (((-s.getZ() + 1) /2) + 0.05) ;
 				accelerometerZForce.setProgress(z);
 
 			}

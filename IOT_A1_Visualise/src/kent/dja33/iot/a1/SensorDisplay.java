@@ -413,8 +413,8 @@ public class SensorDisplay extends Application {
 			/* Set up data for ScatterGraph used to display Accelerometer */
 			NumberAxis scatterX = new NumberAxis();
 			NumberAxis scatterY = new NumberAxis();
-			scatterX.setLabel("X");
-			scatterY.setLabel("Y");
+			scatterX.setLabel("Accelerometer Y");
+			scatterY.setLabel("Accelerometer X");
 
 			scatterX.setUpperBound(1.2);
 			scatterX.setLowerBound(-1.2);
